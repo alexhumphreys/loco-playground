@@ -1,9 +1,10 @@
 on:
-  workflow_call:
-
+  workflow_call: null
 jobs:
   empty-job:
     runs-on: ubuntu-latest
     steps:
       - run: |
           echo "can remove when there's other jobs"
+  new:
+    uses: this-org/this-repo/some-path
