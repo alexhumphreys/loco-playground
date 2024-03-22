@@ -1,0 +1,9 @@
+on:
+  workflow_call:
+
+jobs:
+  empty-job:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          echo "can remove when there's other jobs"
