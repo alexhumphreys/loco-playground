@@ -1,4 +1,4 @@
-use crate::error::Error;
+use crate::error::Errors;
 use reqwest;
 use reqwest::{
     header::USER_AGENT,
@@ -8,73 +8,12 @@ use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use tracing;
 
-pub fn get_client() -> ClientWithMiddleware {
-    let client = ClientBuilder::new(reqwest::Client::new())
-        // Trace HTTP requests. See the tracing crate to make use of these traces.
-        .with_init(Extension(OtelName("openfga-client".into())))
-        .with(TracingMiddleware::default())
-        .build();
+pub fn get_client() -> reqwest::Client {
+    let client = reqwest::Client::new();
 
     client
-}
-
-fn get_trace_info() -> HeaderMap {
-    let span = tracing::Span::current();
-    let context = span.context();
-    let propagator = TraceContextPropagator::new();
-    let mut fields = HashMap::new();
-    propagator.inject_context(&context, &mut fields);
-    propagator.inject_context(&context, &mut fields);
-    let headers = fields
-        .into_iter()
-        .map(|(k, v)| {
-            (
-                HeaderName::try_from(k).unwrap(),
-                HeaderValue::try_from(v).unwrap(),
-            )
-        })
-        .collect();
-
-    set_text_map_propagator(TraceContextPropagator::new());
-    let trace_id = find_current_trace_id().unwrap_or("".to_string());
-    tracing::debug!("traceId in get_trace_info:");
-    tracing::debug!(trace_id);
-    headers
-}
-
-#[tracing::instrument]
-pub async fn get_client_by_token(
-    token: String,
-    headers: Option<HeaderMap>,
-) -> Result<model::ClientModel, Error> {
-    let http_client = get_client();
-    let api_base_url = std::env::var("FGA_BASE_URL").expect("Define FGA_BASE_URL");
-
-    let trace_headers = get_trace_info();
-    let body = schema::ValidateToken { token };
-    let req = http_client
-        .get(format!("{}/api/clients/validate_token", api_base_url))
-        .headers(headers.unwrap_or_default())
-        .headers(trace_headers)
-        .json::<schema::ValidateToken>(&body);
-
-    tracing::info!("request being sent: {:?}", req);
-    let res = req.send().await?;
-    tracing::info!("response body: {:?}", res);
-    todo!()
-    /*
-    match res.json::<DataBody<model::ClientModel>>().await {
-        Ok(client) => {
-            tracing::debug!("user id: {:?}", client.data.user_id);
-            Ok(client.data)
-        }
-        Err(e) => {
-            tracing::error!("Error fetching client: {:?}", e);
-            Err(Error::Unauthorized)
-        }
-    }
-    */
 }
 
 #[derive(Serialize, Deserialize, Debug)]
@@ -95,17 +34,15 @@ pub struct CreateDataStoreResponse {
 pub async fn create_data_store(
     store: CreateDataStoreSchema,
     headers: Option<HeaderMap>,
-) -> Result<CreateDataStoreResponse, Error> {
+) -> Result<CreateDataStoreResponse, Errors> {
     let http_client = get_client();
     //let fga_base_url = std::env::var("FGA_BASE_URL").expect("Define FGA_BASE_URL");
     let fga_base_url = "http://127.0.0.1:8080";
-    let trace_headers = get_trace_info();
 
     let req = http_client
         .post(format!("{}/stores", fga_base_url))
         .headers(headers.unwrap_or_default())
-        .headers(trace_headers)
-        .json::<CreateDataStoreSchema>(&store);
+        .json(&store);
     tracing::debug!("request being sent: {:?}", req);
     let res = req.send().await?;
     tracing::debug!("response body: {:?}", res);
@@ -148,16 +85,14 @@ pub async fn write_relationship_tuple(
     store_id: String,
     tuples: WriteRelationshipTupleSchema,
     headers: Option<HeaderMap>,
-) -> Result<WriteRelationshipTupleResponse, Error> {
+) -> Result<WriteRelationshipTupleResponse, Errors> {
     let http_client = get_client();
     //let fga_base_url = std::env::var("FGA_BASE_URL").expect("Define FGA_BASE_URL");
     let fga_base_url = "http://127.0.0.1:8080";
-    let trace_headers = get_trace_info();
 
     let req = http_client
         .post(format!("{}/stores/{}/write", fga_base_url, store_id))
         .headers(headers.unwrap_or_default())
-        .headers(trace_headers)
         .json::<WriteRelationshipTupleSchema>(&tuples);
     tracing::debug!("request being sent: {:?}", req);
     let res = req.send().await?;
@@ -177,11 +112,10 @@ pub async fn write_authorization_model(
     store_id: String,
     model: String,
     headers: Option<HeaderMap>,
-) -> Result<WriteAuthorizationModelResponse, Error> {
+) -> Result<WriteAuthorizationModelResponse, Errors> {
     let http_client = get_client();
     //let fga_base_url = std::env::var("FGA_BASE_URL").expect("Define FGA_BASE_URL");
     let fga_base_url = "http://127.0.0.1:8080";
-    let trace_headers = get_trace_info();
 
     let v: Value = serde_json::from_str(&model)?;
 
@@ -191,7 +125,6 @@ pub async fn write_authorization_model(
             fga_base_url, store_id
         ))
         .headers(headers.unwrap_or_default())
-        .headers(trace_headers)
         .json::<Value>(&v);
     tracing::debug!("request being sent: {:?}", req);
     let res = req.send().await?;
@@ -219,11 +152,10 @@ pub async fn check(
     model_id: String,
     tuple: RelationshipTuple,
     headers: Option<HeaderMap>,
-) -> Result<CheckResponse, Error> {
+) -> Result<CheckResponse, Errors> {
     let http_client = get_client();
     //let fga_base_url = std::env::var("FGA_BASE_URL").expect("Define FGA_BASE_URL");
     let fga_base_url = "http://127.0.0.1:8080";
-    let trace_headers = get_trace_info();
 
     let body = CheckRequest {
         authorization_model_id: model_id,
@@ -232,13 +164,15 @@ pub async fn check(
     let req = http_client
         .post(format!("{}/stores/{}/check", fga_base_url, store_id))
         .headers(headers.unwrap_or_default())
-        .headers(trace_headers)
         .json::<CheckRequest>(&body);
     tracing::debug!("request being sent: {:?}", req);
     let res = req.send().await?;
     tracing::debug!("response body: {:?}", res);
     println!("{:?}", res);
-    Ok(res.json::<CheckResponse>().await?)
+
+    let x = res.json::<CheckResponse>().await?;
+    Ok(x)
+    // Ok(res.json::<CheckResponse>().await?)
 }
 
 pub fn make_tuple(user: &str, relation: &str, object: &str) -> RelationshipTuple {
