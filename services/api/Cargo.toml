@@ -1,0 +1,43 @@
+[[bin]]
+  name = 'api-cli'
+  path = 'src/bin/main.rs'
+  required-features = []
+
+[dependencies]
+  async-trait = '0.1.74'
+  axum = '0.7.1'
+  eyre = '*'
+  serde = '*'
+  serde_json = '*'
+  tracing = '0.1.40'
+
+  [dependencies.loco-rs]
+    default-features = false
+    features = ['cli']
+    version = '0.3.2'
+
+  [dependencies.tokio]
+    default-features = false
+    version = '1.33.0'
+
+  [dependencies.tracing-subscriber]
+    features = ['env-filter', 'json']
+    version = '0.3.17'
+
+[dev-dependencies]
+  rstest = '*'
+  serial_test = '*'
+
+  [dev-dependencies.insta]
+    features = ['redactions', 'yaml', 'filters']
+    version = '*'
+
+  [dev-dependencies.loco-rs]
+    default-features = false
+    features = ['testing', 'cli']
+    version = '0.3.2'
+
+[package]
+  edition = '2021'
+  name = 'api'
+  version = '0.1.0'
