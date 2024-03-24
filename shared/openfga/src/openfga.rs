@@ -1,14 +1,128 @@
 use crate::error::Errors;
-use reqwest;
-use reqwest::{
-    header::USER_AGENT,
-    header::{HeaderMap, HeaderName, HeaderValue},
-};
-use serde::de::DeserializeOwned;
+use reqwest::header::HeaderMap;
+use reqwest::{self, Method, RequestBuilder, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::collections::HashMap;
 use tracing;
+
+pub struct OpenFGAClient {
+    client: reqwest::Client,
+    config: OpenFGAConfig,
+    store_id: Option<String>,
+    model_id: Option<String>,
+}
+
+pub struct OpenFGAConfig {
+    pub base_url: String,
+    pub api_token: Option<String>,
+}
+
+impl OpenFGAClient {
+    async fn make_request<T, B>(
+        &self,
+        path: &str,
+        method: Method,
+        body: Option<B>,
+    ) -> Result<T, Errors>
+    where
+        T: for<'de> Deserialize<'de>,
+        B: Serialize,
+    {
+        let url = Url::parse(&format!("{}/{}", self.config.base_url, path))?;
+        let req = self
+            .client
+            .request(method, url)
+            .headers(self.auth_headers());
+        let req = match body {
+            Some(body) => req.json(&body),
+            None => req,
+        };
+        tracing::debug!("request being sent: {:?}", req);
+        let res = req.send().await?;
+        tracing::debug!("response body: {:?}", res);
+        Ok(res.json::<T>().await?)
+    }
+
+    fn auth_headers(&self) -> HeaderMap {
+        let mut headers = HeaderMap::new();
+        if let Some(token) = &self.config.api_token {
+            headers.insert("Authorization", token.parse().unwrap());
+        }
+        headers
+    }
+}
+
+impl OpenFGAClient {
+    pub async fn create_data_store(
+        &self,
+        store: CreateDataStoreSchema,
+    ) -> Result<CreateDataStoreResponse, Errors> {
+        let res: CreateDataStoreResponse = self
+            .make_request("/stores", Method::POST, Some(store))
+            .await?;
+        Ok(res)
+    }
+
+    async fn write_relationship_tuple(
+        &self,
+        store_id: String,
+        tuples: WriteRelationshipTupleSchema,
+    ) -> Result<WriteRelationshipTupleResponse, Errors> {
+        let res: WriteRelationshipTupleResponse = self
+            .make_request(
+                &format!("/stores/{}/write", store_id),
+                Method::POST,
+                Some(tuples),
+            )
+            .await?;
+        Ok(res)
+    }
+
+    async fn write_authorization_model(
+        &self,
+        store_id: String,
+        model: String,
+    ) -> Result<WriteAuthorizationModelResponse, Errors> {
+        let res: WriteAuthorizationModelResponse = self
+            .make_request(
+                &format!("/stores/{}/authorization-models", store_id),
+                Method::POST,
+                Some(model),
+            )
+            .await?;
+        Ok(res)
+    }
+
+    // TODO: some way to only call this when you have a store/model id?
+    async fn check(&self, tuple: RelationshipTuple) -> Result<CheckResponse, Errors> {
+        match (&self.store_id, &self.model_id) {
+            (Some(store_id), Some(model_id)) => {
+                let res: CheckResponse = self
+                    .make_request(
+                        &format!("/stores/{}/check", store_id),
+                        Method::POST,
+                        Some(CheckRequest {
+                            authorization_model_id: model_id.clone(),
+                            tuple_key: tuple,
+                        }),
+                    )
+                    .await?;
+                Ok(res)
+            }
+            (None, _) => Err(Errors::MissingStoreId),
+            (_, None) => Err(Errors::MissingStoreId),
+        }
+    }
+}
+
+pub fn create_openfga_client(config: OpenFGAConfig) -> OpenFGAClient {
+    OpenFGAClient {
+        client: reqwest::Client::new(),
+        config,
+        store_id: None,
+        model_id: None,
+    }
+}
 
 pub fn get_client() -> reqwest::Client {
     let client = reqwest::Client::new();
@@ -105,6 +219,23 @@ pub async fn write_relationship_tuple(
 pub struct WriteAuthorizationModelResponse {
     // {"authorization_model_id":"01HJ8QTTREQ7QJ9P5BCK0RHH5F"}
     authorization_model_id: String,
+}
+
+#[tracing::instrument]
+pub async fn get_authorization_models(
+    store_id: String,
+    headers: Option<HeaderMap>,
+) -> Result<(), Errors> {
+    todo!()
+}
+
+#[tracing::instrument]
+pub async fn get_authorization_model(
+    store_id: String,
+    model_id: String,
+    headers: Option<HeaderMap>,
+) -> Result<(), Errors> {
+    todo!()
 }
 
 #[tracing::instrument]
