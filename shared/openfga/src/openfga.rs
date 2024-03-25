@@ -1,9 +1,20 @@
 use crate::error::Errors;
 use reqwest::header::HeaderMap;
-use reqwest::{self, Method, RequestBuilder, Url};
+use reqwest::{self, Method, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing;
+
+pub struct OpenFGAError {
+    /*
+    {
+    "code": "internal_error",
+    "message": "Internal Server Error"
+    }
+    */
+    pub code: String,
+    pub message: String,
+}
 
 pub struct OpenFGAClient {
     client: reqwest::Client,
@@ -12,6 +23,14 @@ pub struct OpenFGAClient {
     model_id: Option<String>,
 }
 
+pub struct OpenFGAClientFull {
+    client: reqwest::Client,
+    config: OpenFGAConfig,
+    store_id: String,
+    model_id: String,
+}
+
+#[derive(Clone)]
 pub struct OpenFGAConfig {
     pub base_url: String,
     pub api_token: Option<String>,
@@ -28,7 +47,7 @@ impl OpenFGAClient {
         T: for<'de> Deserialize<'de>,
         B: Serialize,
     {
-        let url = Url::parse(&format!("{}/{}", self.config.base_url, path))?;
+        let url = Url::parse(&format!("{}{}", self.config.base_url, path))?;
         let req = self
             .client
             .request(method, url)
@@ -37,10 +56,15 @@ impl OpenFGAClient {
             Some(body) => req.json(&body),
             None => req,
         };
+        println!("request: {:?}", req);
         tracing::debug!("request being sent: {:?}", req);
         let res = req.send().await?;
+        println!("response body: {:?}", res);
         tracing::debug!("response body: {:?}", res);
-        Ok(res.json::<T>().await?)
+        match res.error_for_status() {
+            Ok(res) => Ok(res.json::<T>().await?),
+            Err(err) => Err(Errors::ReqwestError(err)),
+        }
     }
 
     fn auth_headers(&self) -> HeaderMap {
@@ -65,14 +89,20 @@ impl OpenFGAClient {
 
     async fn write_relationship_tuple(
         &self,
-        store_id: String,
-        tuples: WriteRelationshipTupleSchema,
+        tuples: RelationshipAction,
     ) -> Result<WriteRelationshipTupleResponse, Errors> {
+        let body = WriteRelationshipTupleSchema {
+            authorization_model_id: self.model_id.clone().ok_or(Errors::MissingModelId)?,
+            relationship_action: tuples,
+        };
         let res: WriteRelationshipTupleResponse = self
             .make_request(
-                &format!("/stores/{}/write", store_id),
+                &format!(
+                    "/stores/{}/write",
+                    self.store_id.clone().ok_or(Errors::MissingStoreId)?
+                ),
                 Method::POST,
-                Some(tuples),
+                Some(body),
             )
             .await?;
         Ok(res)
@@ -80,14 +110,31 @@ impl OpenFGAClient {
 
     async fn write_authorization_model(
         &self,
-        store_id: String,
         model: String,
     ) -> Result<WriteAuthorizationModelResponse, Errors> {
         let res: WriteAuthorizationModelResponse = self
             .make_request(
-                &format!("/stores/{}/authorization-models", store_id),
+                &format!(
+                    "/stores/{}/authorization-models",
+                    self.store_id.clone().ok_or(Errors::MissingStoreId)?
+                ),
                 Method::POST,
                 Some(model),
+            )
+            .await?;
+        Ok(res)
+    }
+
+    async fn get_authorization_models(
+        &self,
+        store_id: String,
+    ) -> Result<GetAuthorizationModelsResponse, Errors> {
+        let body: Option<()> = None;
+        let res: GetAuthorizationModelsResponse = self
+            .make_request(
+                &format!("/stores/{}/authorization-models", store_id),
+                Method::GET,
+                body,
             )
             .await?;
         Ok(res)
@@ -115,11 +162,25 @@ impl OpenFGAClient {
     }
 }
 
-pub fn create_openfga_client(config: OpenFGAConfig) -> OpenFGAClient {
+pub fn create_openfga_client(
+    config: OpenFGAConfig,
+    store_id: Option<String>,
+    model_id: Option<String>,
+) -> OpenFGAClient {
     OpenFGAClient {
         client: reqwest::Client::new(),
         config,
-        store_id: None,
+        store_id,
+        model_id,
+    }
+}
+
+pub fn create_openfga_client_full(config: OpenFGAConfig, store_id: String) -> OpenFGAClient {
+    // TODO get the model id
+    OpenFGAClient {
+        client: reqwest::Client::new(),
+        config,
+        store_id: Some(store_id),
         model_id: None,
     }
 }
@@ -221,6 +282,32 @@ pub struct WriteAuthorizationModelResponse {
     authorization_model_id: String,
 }
 
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct AuthorizationModel {
+    id: String,
+    type_definitions: Vec<Value>,
+}
+
+#[derive(Serialize, Deserialize, Debug, PartialEq, Eq)]
+pub struct GetAuthorizationModelsResponse {
+    /*
+         * {
+      "authorization_models": [
+        {
+          "id": "01G50QVV17PECNVAHX1GG4Y5NC",
+          "type_definitions": [...]
+        },
+        {
+          "id": "01G4ZW8F4A07AKQ8RHSVG9RW04",
+          "type_definitions": [...]
+        },
+      ],
+      "continuation_token": "eyJwayI6IkxBVEVTVF9OU0NPTkZJR19hdXRoMHN0b3JlIiwic2siOiIxem1qbXF3MWZLZExTcUoyN01MdTdqTjh0cWgifQ=="
+    }*/
+    authorization_models: Vec<AuthorizationModel>,
+    continuation_token: String,
+}
+
 #[tracing::instrument]
 pub async fn get_authorization_models(
     store_id: String,
@@ -317,6 +404,57 @@ pub fn make_tuple(user: &str, relation: &str, object: &str) -> RelationshipTuple
 #[cfg(test)]
 mod tests {
     use crate::openfga::*;
+
+    fn model_string() -> String {
+        r#"
+        {"schema_version":"1.1","type_definitions":[{"type":"user"},{"type":"document","relations":{"reader":{"this":{}},"writer":{"this":{}},"owner":{"this":{}}},"metadata":{"relations":{"reader":{"directly_related_user_types":[{"type":"user"}]},"writer":{"directly_related_user_types":[{"type":"user"}]},"owner":{"directly_related_user_types":[{"type":"user"}]}}}}]}
+        "#
+        .to_string()
+    }
+
+    #[tokio::test]
+    async fn test_new_openfga_create_data_store() {
+        let config = OpenFGAConfig {
+            base_url: "http://127.0.0.1:8080".to_string(),
+            api_token: None,
+        };
+
+        let openfga_client = create_openfga_client(config.clone(), None, None);
+
+        let store_name = "newfoobar".to_string();
+
+        println!("creating data store");
+        let res = openfga_client
+            .create_data_store(CreateDataStoreSchema { name: store_name })
+            .await;
+
+        println!("res {:?}", res);
+        let res = res.unwrap();
+
+        let store_id = res.id;
+        let openfga_client = create_openfga_client(config.clone(), Some(store_id.clone()), None);
+
+        println!("creating model");
+        let res = openfga_client
+            .write_authorization_model(model_string())
+            .await
+            .unwrap();
+
+        let model_id = res.authorization_model_id;
+        let openfga_client = create_openfga_client(config, Some(store_id), Some(model_id));
+
+        let tuple = make_tuple("user:789", "reader", "document:z");
+        let relationship_action = RelationshipAction::Writes(TupleKeys {
+            tuple_keys: vec![tuple.clone()],
+        });
+        let _res = openfga_client
+            .write_relationship_tuple(relationship_action)
+            .await
+            .unwrap();
+
+        let res = openfga_client.check(tuple).await.unwrap();
+        assert_eq!(res.allowed, true);
+    }
 
     #[tokio::test]
     async fn test_openfga_create_data_store() {
