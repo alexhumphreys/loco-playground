@@ -114,7 +114,7 @@ impl OpenFGAClient {
 
     async fn write_authorization_model(
         &self,
-        model: String,
+        model: Value,
     ) -> Result<WriteAuthorizationModelResponse, Errors> {
         let res: WriteAuthorizationModelResponse = self
             .make_request(
@@ -439,10 +439,8 @@ mod tests {
         let openfga_client = create_openfga_client(config.clone(), Some(store_id.clone()), None);
 
         println!("creating model");
-        let res = openfga_client
-            .write_authorization_model(model_string())
-            .await
-            .unwrap();
+        let v: Value = serde_json::from_str(&model_string()).unwrap();
+        let res = openfga_client.write_authorization_model(v).await.unwrap();
 
         let model_id = res.authorization_model_id;
         let openfga_client = create_openfga_client(config, Some(store_id), Some(model_id));
