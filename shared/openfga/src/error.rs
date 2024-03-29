@@ -44,7 +44,11 @@ pub enum Errors {
     #[diagnostic(code(openfga::missing_model_id))]
     MissingModelId,
 
+    #[error("no model for client")]
+    #[diagnostic(code(openfga::no_model_for_client))]
+    NoModelForClient,
+
     #[error("openfga error ")]
-    #[diagnostic(code(openfga_error::missing_model_id))]
+    #[diagnostic(code(openfga::openfga_error_response))]
     OpenFGAErrorRespone(#[from] OpenFGAError),
 }

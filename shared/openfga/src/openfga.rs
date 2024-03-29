@@ -129,14 +129,14 @@ impl OpenFGAClient {
         Ok(res)
     }
 
-    async fn get_authorization_models(
-        &self,
-        store_id: String,
-    ) -> Result<GetAuthorizationModelsResponse, Errors> {
+    async fn get_authorization_models(&self) -> Result<GetAuthorizationModelsResponse, Errors> {
         let body: Option<()> = None;
         let res: GetAuthorizationModelsResponse = self
             .make_request(
-                &format!("/stores/{}/authorization-models", store_id),
+                &format!(
+                    "/stores/{}/authorization-models",
+                    self.store_id.clone().ok_or(Errors::MissingStoreId)?
+                ),
                 Method::GET,
                 body,
             )
@@ -179,13 +179,25 @@ pub fn create_openfga_client(
     }
 }
 
-pub fn create_openfga_client_full(config: OpenFGAConfig, store_id: String) -> OpenFGAClient {
-    // TODO get the model id
-    OpenFGAClient {
+pub async fn create_openfga_client_full(
+    config: OpenFGAConfig,
+    store_id: String,
+) -> Result<OpenFGAClient, Errors> {
+    let client = OpenFGAClient {
         client: reqwest::Client::new(),
-        config,
-        store_id: Some(store_id),
+        config: config.clone(),
+        store_id: Some(store_id.clone()),
         model_id: None,
+    };
+    let models = client.get_authorization_models().await?;
+    match models.authorization_models.first() {
+        Some(model) => Ok(OpenFGAClient {
+            client: reqwest::Client::new(),
+            config,
+            store_id: Some(store_id),
+            model_id: Some(model.id.clone()),
+        }),
+        None => Err(Errors::NoModelForClient),
     }
 }
 
@@ -456,6 +468,9 @@ mod tests {
 
         let res = openfga_client.check(tuple).await.unwrap();
         assert_eq!(res.allowed, true);
+
+        let res = openfga_client.get_authorization_models().await.unwrap();
+        assert_eq!(res.authorization_models.len() > 0, true);
     }
 
     #[tokio::test]
