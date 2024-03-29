@@ -1,6 +1,7 @@
 use async_trait::async_trait;
+use initializers;
 use loco_rs::{
-    app::{AppContext, Hooks},
+    app::{AppContext, Hooks, Initializer},
     boot::{create_app, BootResult, StartMode},
     controller::AppRoutes,
     environment::Environment,
@@ -26,6 +27,10 @@ impl Hooks for App {
                 .or(option_env!("GITHUB_SHA"))
                 .unwrap_or("dev")
         )
+    }
+
+    async fn initializers(_ctx: &AppContext) -> Result<Vec<Box<dyn Initializer>>> {
+        Ok(vec![Box::new(initializers::openfga::OpenFgaInitializer)])
     }
 
     async fn boot(mode: StartMode, environment: &Environment) -> Result<BootResult> {

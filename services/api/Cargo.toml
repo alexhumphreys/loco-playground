@@ -10,6 +10,8 @@
   serde = '*'
   serde_json = '*'
   tracing = '0.1.40'
+  initializers = { path = "../../shared/initializers" }
+  openfga = { path = "../../shared/openfga" }
 
   [dependencies.loco-rs]
     default-features = false

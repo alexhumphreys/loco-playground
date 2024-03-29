@@ -92,7 +92,7 @@ impl OpenFGAClient {
         Ok(res)
     }
 
-    async fn write_relationship_tuple(
+    pub async fn write_relationship_tuple(
         &self,
         tuples: RelationshipAction,
     ) -> Result<WriteRelationshipTupleResponse, Errors> {
@@ -113,7 +113,7 @@ impl OpenFGAClient {
         Ok(res)
     }
 
-    async fn write_authorization_model(
+    pub async fn write_authorization_model(
         &self,
         model: Value,
     ) -> Result<WriteAuthorizationModelResponse, Errors> {
@@ -130,7 +130,7 @@ impl OpenFGAClient {
         Ok(res)
     }
 
-    async fn get_authorization_models(&self) -> Result<GetAuthorizationModelsResponse, Errors> {
+    pub async fn get_authorization_models(&self) -> Result<GetAuthorizationModelsResponse, Errors> {
         let body: Option<()> = None;
         let res: GetAuthorizationModelsResponse = self
             .make_request(
@@ -146,7 +146,7 @@ impl OpenFGAClient {
     }
 
     // TODO: some way to only call this when you have a store/model id?
-    async fn check(&self, tuple: RelationshipTuple) -> Result<CheckResponse, Errors> {
+    pub async fn check(&self, tuple: RelationshipTuple) -> Result<CheckResponse, Errors> {
         match (&self.store_id, &self.model_id) {
             (Some(store_id), Some(model_id)) => {
                 let res: CheckResponse = self
