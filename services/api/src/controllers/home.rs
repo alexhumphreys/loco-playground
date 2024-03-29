@@ -7,10 +7,10 @@ use crate::views::home::HomeResponse;
 
 async fn current(Extension(c): Extension<OpenFGAClient>) -> Result<Json<HomeResponse>> {
     let tuple = make_tuple("user:alex", "reader", "document:id123789");
-    let relationship_action = openfga::openfga::RelationshipAction::Writes(TupleKeys {
+    let tuple = TupleKeys {
         tuple_keys: vec![tuple.clone()],
-    });
-    let x = c.write_relationship_tuple(relationship_action).await;
+    };
+    let _x = c.write_relationship_tuple(tuple).await;
     format::json(HomeResponse::new("loco"))
 }
 
