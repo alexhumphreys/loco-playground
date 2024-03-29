@@ -15,6 +15,7 @@ enum ReqwestResponse<T> {
     Success(T),
 }
 
+#[derive(Debug, Clone)]
 pub struct OpenFGAClient {
     client: reqwest::Client,
     config: OpenFGAConfig,
@@ -29,7 +30,7 @@ pub struct OpenFGAClientFull {
     model_id: String,
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct OpenFGAConfig {
     pub base_url: String,
     pub api_token: Option<String>,

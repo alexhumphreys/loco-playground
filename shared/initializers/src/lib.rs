@@ -1,9 +1,8 @@
+mod openfga;
+
 pub fn add(left: usize, right: usize) -> usize {
     left + right
 }
-
-pub mod error;
-pub mod openfga;
 
 #[cfg(test)]
 mod tests {

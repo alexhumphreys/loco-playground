@@ -1423,6 +1423,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "initializers"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "axum",
+ "loco-rs",
+ "openfga",
+]
+
+[[package]]
 name = "insta"
 version = "1.36.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"

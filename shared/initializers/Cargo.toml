@@ -1,0 +1,16 @@
+[package]
+name = "initializers"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+openfga = { path = "../openfga" }
+async-trait = '0.1.74'
+axum = '0.7.1'
+
+  [dependencies.loco-rs]
+    default-features = false
+    features = ['cli']
+    version = '0.3.2'

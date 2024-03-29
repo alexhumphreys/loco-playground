@@ -1,3 +1,3 @@
 [workspace]
-  members = ['shared/openfga', 'services/api']
+  members = ['shared/openfga', 'shared/initializers', 'services/api']
   resolver = '2'
