@@ -1,19 +1,18 @@
+use std::fmt::{Debug, Display};
+
 use crate::error::Errors;
+use crate::error::OpenFGAError;
 use reqwest::header::HeaderMap;
-use reqwest::{self, Method, Url};
+use reqwest::{self, Method, StatusCode, Url};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use tracing;
 
-pub struct OpenFGAError {
-    /*
-    {
-    "code": "internal_error",
-    "message": "Internal Server Error"
-    }
-    */
-    pub code: String,
-    pub message: String,
+#[derive(Serialize, Deserialize, Debug)]
+#[serde(untagged)]
+enum ReqwestResponse<T> {
+    Error(OpenFGAError),
+    Success(T),
 }
 
 pub struct OpenFGAClient {
@@ -45,7 +44,7 @@ impl OpenFGAClient {
     ) -> Result<T, Errors>
     where
         T: for<'de> Deserialize<'de>,
-        B: Serialize,
+        B: Serialize + Debug,
     {
         let url = Url::parse(&format!("{}{}", self.config.base_url, path))?;
         let req = self
@@ -53,17 +52,22 @@ impl OpenFGAClient {
             .request(method, url)
             .headers(self.auth_headers());
         let req = match body {
-            Some(body) => req.json(&body),
+            Some(body) => {
+                println!("body: {:?}", body);
+                req.json(&body)
+            }
             None => req,
         };
         println!("request: {:?}", req);
         tracing::debug!("request being sent: {:?}", req);
         let res = req.send().await?;
-        println!("response body: {:?}", res);
-        tracing::debug!("response body: {:?}", res);
-        match res.error_for_status() {
-            Ok(res) => Ok(res.json::<T>().await?),
-            Err(err) => Err(Errors::ReqwestError(err)),
+
+        match res.json::<ReqwestResponse<T>>().await? {
+            ReqwestResponse::Success(body) => Ok(body),
+            ReqwestResponse::Error(err) => {
+                println!("error: {:?}", err);
+                Err(Errors::OpenFGAErrorRespone(err))
+            }
         }
     }
 

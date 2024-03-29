@@ -1,5 +1,26 @@
 use miette::Diagnostic;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+#[derive(Serialize, Deserialize, Debug)]
+pub struct OpenFGAError {
+    /*
+    {
+    "code": "internal_error",
+    "message": "Internal Server Error"
+    }
+    */
+    pub code: String,
+    pub message: String,
+}
+
+impl std::fmt::Display for OpenFGAError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "OpenFGAError: {}", self.message)
+    }
+}
+
+impl std::error::Error for OpenFGAError {}
 
 #[derive(Error, Diagnostic, Debug)]
 pub enum Errors {
@@ -22,4 +43,8 @@ pub enum Errors {
     #[error("missing model id")]
     #[diagnostic(code(openfga::missing_model_id))]
     MissingModelId,
+
+    #[error("openfga error ")]
+    #[diagnostic(code(openfga_error::missing_model_id))]
+    OpenFGAErrorRespone(#[from] OpenFGAError),
 }
