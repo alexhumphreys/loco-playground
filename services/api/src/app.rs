@@ -1,4 +1,5 @@
 use async_trait::async_trait;
+use axum::middleware;
 use initializers;
 use loco_rs::{
     app::{AppContext, Hooks, Initializer},
@@ -46,4 +47,8 @@ impl Hooks for App {
     fn connect_workers<'a>(_p: &'a mut Processor, _ctx: &'a AppContext) {}
 
     fn register_tasks(_tasks: &mut Tasks) {}
+
+    async fn after_routes(router: axum::Router, _ctx: &AppContext) -> Result<axum::Router> {
+        Ok(router.layer(middleware::from_fn(controllers::home::auth)))
+    }
 }

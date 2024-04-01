@@ -21,7 +21,8 @@ impl Initializer for OpenFgaInitializer {
 
         let client = openfga::openfga::create_openfga_client_full(
             config,
-            "01HT4PESMVJPG4KY0127WPA668".to_string(),
+            // TODO don't hardcode
+            "01HTD8S2F6FBEQFMNZKECV8DSY".to_string(),
         )
         .await
         .unwrap();
