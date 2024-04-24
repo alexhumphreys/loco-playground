@@ -7,4 +7,4 @@ jobs:
       - run: |
           echo "can remove when there's other jobs"
   new:
-    uses: this-org/this-repo/services/api/.github/workflows
+    uses: this-org/this-repo/services/frontend/.github/workflows

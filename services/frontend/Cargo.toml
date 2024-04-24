@@ -1,0 +1,64 @@
+[[bin]]
+  name = 'frontend-cli'
+  path = 'src/bin/main.rs'
+  required-features = []
+
+[dependencies]
+  async-trait = '0.1.74'
+  axum = '0.7.1'
+  chrono = '0.4'
+  eyre = '0.6'
+  include_dir = '0.7'
+  serde_json = '1'
+  tracing = '0.1.40'
+  unic-langid = '0.9.4'
+
+  [dependencies.fluent-templates]
+    features = ['tera']
+    version = '0.8.0'
+
+  [dependencies.loco-rs]
+    version = '0.4.0'
+
+  [dependencies.migration]
+    path = 'migration'
+
+  [dependencies.sea-orm]
+    features = ['sqlx-sqlite', 'sqlx-postgres', 'runtime-tokio-rustls', 'macros']
+    version = '1.0.0-rc.1'
+
+  [dependencies.serde]
+    features = ['derive']
+    version = '1'
+
+  [dependencies.tokio]
+    default-features = false
+    version = '1.33.0'
+
+  [dependencies.tracing-subscriber]
+    features = ['env-filter', 'json']
+    version = '0.3.17'
+
+  [dependencies.uuid]
+    features = ['v4']
+    version = '1.6.0'
+
+  [dependencies.validator]
+    version = '0.16'
+
+[dev-dependencies]
+  rstest = '0.18.2'
+  serial_test = '2.0.0'
+
+  [dev-dependencies.insta]
+    features = ['redactions', 'yaml', 'filters']
+    version = '1.34.0'
+
+  [dev-dependencies.loco-rs]
+    features = ['testing']
+    version = '0.4.0'
+
+[package]
+  edition = '2021'
+  name = 'frontend'
+  version = '0.1.0'
